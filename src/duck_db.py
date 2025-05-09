@@ -351,7 +351,7 @@ def analyze_busy_days_and_times(con):
     
     return day_data, hour_by_day_data
 
-def test_large_memory_processing(con):
+def test_percentile_calculation(con):
     """
     Specifically test DuckDB's ability to process data larger than memory
     by forcing complex windowing and joins that require disk spilling
@@ -419,12 +419,12 @@ def test_large_memory_processing(con):
         print(f"\nLarger-than-memory processing completed in {timedelta(seconds=duration)} (HH:MM:SS)")
         print(f"Successfully processed {len(result)} percentile groups")
         
-        # Print memory information after processing
-        mem_info = con.execute("PRAGMA memory_info").fetchall()
-        if mem_info:
-            print("\nMemory Usage Information:")
-            for info in mem_info:
-                print(f"- {info[0]}: {info[1]}")
+        # Print the output
+        print(f"{'Percentile':^12}|{'Avg Distance':^15}|{'Avg Fare':^12}|{'Avg Tip':^12}|{'Trip Count':^12}")
+        print("-" * 80)
+        for row in result:
+            percentile, avg_distance, avg_fare, avg_tip, trip_count = row
+            print(f"{percentile:^12}|{avg_distance:^15.2f}|${avg_fare:^11.2f}|${avg_tip:^11.2f}|{trip_count:^12,}")
         
         return True, duration, len(result)
         
@@ -432,52 +432,6 @@ def test_large_memory_processing(con):
         duration = time.time() - start_time
         print(f"Error during larger-than-memory test: {e}")
         return False, duration, 0
-
-def run_analytics(con):
-    """
-    Run all analytics functions and return combined results
-    
-    Args:
-        con (duckdb.DuckDBPyConnection): DuckDB connection
-        
-    Returns:
-        dict: All analytics results
-    """
-    print("\n" + "="*50)
-    print("RUNNING COMPREHENSIVE ANALYTICS")
-    print("="*50)
-    
-    hourly_stats = analyze_trips_by_hour(con)
-    popular_routes = analyze_popular_routes(con, limit=10)
-    payment_stats = analyze_payment_methods(con)
-    day_stats, hourly_day_stats = analyze_busy_days_and_times(con)
-    
-    success, duration, result_count = test_large_memory_processing(con)
-    
-    # Combine all analytics into a single result
-    analytics_results = {
-        "hourly_stats": hourly_stats,
-        "popular_routes": popular_routes,
-        "payment_stats": payment_stats,
-        "day_stats": day_stats,
-        "hourly_day_stats": hourly_day_stats,
-        "large_memory_test": {
-            "success": success,
-            "duration_seconds": duration,
-            "result_count": result_count
-        }
-    }
-    
-    # Create a timestamped filename to avoid overwriting previous results
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    json_filename = f"db/taxi_analytics_{timestamp}.json"
-    
-    # Save analytics results to JSON file
-    with open(json_filename, "w") as f:
-        json.dump(analytics_results, f, indent=2)
-    
-    print(f"\nAnalytics complete. Results saved to {json_filename}")
-    return analytics_results
 
 def main(csv_file=None):
     """
@@ -492,12 +446,10 @@ def main(csv_file=None):
     temp_dir = os.environ.get('DUCKDB_TEMP_DIRECTORY', 'db/temp')
     os.makedirs(temp_dir, exist_ok=True)
     
-    # Default CSV file if none is provided
     if csv_file is None:
         print(f"No file specified, using default: {csv_file}")
         return
     
-    # Validate file existence
     if not os.path.exists(csv_file):
         print(f"Error: Could not find the file at {csv_file}")
         print("Current working directory:", os.getcwd())
@@ -510,7 +462,6 @@ def main(csv_file=None):
     db_name = f"db/taxi_data_{os.path.splitext(csv_basename)[0]}.duckdb"
     print(f"Using database: {db_name}")
     
-    # Check if database file already exists
     db_exists = os.path.exists(db_name)
     if db_exists:
         print(f"Found existing database file at {db_name}")
@@ -577,13 +528,29 @@ def main(csv_file=None):
                     print(f"Day/time analysis failed: {e}")
                     day_stats, hourly_day_stats = {}, {}
                 
+                # Run the larger-than-memory processing test
+                try:
+                    large_memory_success, large_memory_duration, large_memory_results = test_percentile_calculation(con)
+                    large_memory_test = {
+                        "success": large_memory_success,
+                        "duration_seconds": large_memory_duration,
+                        "result_count": large_memory_results
+                    }
+                except Exception as e:
+                    print(f"Large memory processing test failed: {e}")
+                    large_memory_test = {
+                        "success": False,
+                        "error": str(e)
+                    }
+                
                 # Combine all analytics into a single result
                 analytics_results = {
                     "hourly_stats": hourly_stats,
                     "popular_routes": popular_routes,
                     "payment_stats": payment_stats,
                     "day_stats": day_stats,
-                    "hourly_day_stats": hourly_day_stats
+                    "hourly_day_stats": hourly_day_stats,
+                    "large_memory_test": large_memory_test
                 }
                 
                 timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")

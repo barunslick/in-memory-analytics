@@ -13,7 +13,7 @@ The repository includes implementations and benchmarks for:
 ## Dataset
 
 The project uses NYC Yellow Taxi Trip 2016 data as a test dataset, which provides a realistic medium-sized dataset for testing analytical performance.
-[Dataset available on Kaggle](https://www.kaggle.com/datasets/elemento/nyc-yellow-taxi-trip-data)
+[Dataset available on Kaggle](https://www.kaggle.com/datasets/elemento/nyc-yellow-taxi-trip-data) (~1.7GB)
 
 ## Project Structure
 
@@ -53,7 +53,7 @@ docker compose build
 docker compose run analytics
 
 # View the results
-cat reports/<tool>_taxi_analytics_<run_datetime>_results.json
+cat reports/<tool>_taxi_analytics_<run_datetime>.json
 ```
 
 ## Testing Your Own Data
