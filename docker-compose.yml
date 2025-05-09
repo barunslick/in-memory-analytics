@@ -1,0 +1,11 @@
+services:
+  analytics:
+    build: .
+    mem_limit: 350m
+    volumes:
+      - ./files:/app/files
+      - ./db:/app/db
+      - ./reports:/app/reports
+    environment:
+      - DUCKDB_TEMP_DIRECTORY=/app/db/temp
+      - DUCKDB_MEMORY_LIMIT=200MB
